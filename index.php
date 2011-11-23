@@ -19,7 +19,7 @@
 ****************************************/
 
 // Include our initialization file
-require(dirname(getcwd()) . "/lib/init.php");
+require(getcwd() . "/lib/init.php");
 
 // Grab the RoutingController object and route this call to the appropriate controller/module
 global $routing_controller;

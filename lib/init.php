@@ -24,7 +24,7 @@
 define('PRODSERV', false);
 
 // Directory definitions
-define('ROOT_DIR', dirname(getcwd()) . '/');
+define('ROOT_DIR', getcwd() . '/');
 define('LIB_DIR', ROOT_DIR . 'lib/');
 define('VIEW_DIR', ROOT_DIR . 'views/');
 define('MODEL_DIR', ROOT_DIR . 'models/');
@@ -55,7 +55,8 @@ function __autoload($class)
 }
 
 // Get our connection to the database
-$dbconn = new $dbini['type'];
+$dbtype = DB_TYPE;
+$dbconn = new $dbtype;
 if(strlen(DB_HOST) && strlen(DB_USER) && strlen(DB_PASS) && strlen(DB_NAME))
 	$dbconn->initialize(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
