@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [ $1 == "create" ]; then
 	if [ $# -le 2 ]; then
