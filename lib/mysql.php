@@ -58,6 +58,20 @@ class MySQL extends Database {
 		return($result);
 	}
 
+	// Execute a raw query
+	function raw_query($query, $vars = array()) {
+		foreach($vars as $key => $value)
+                {
+                        $value = $this->conn->real_escape_string($value);
+                        $query = str_replace(":$key", $value, $query);
+                }
+
+                if(!$result = $this->conn->query($query))
+                        error_log("MySQL Error: " . $this->conn->error . "\nQuery: " . $query);
+
+                return($result);
+	}
+
 	// Execute a query, returning a single object
 	function object_query($query, $vars = array(), $flags = array(), $object_type = 'stdClass') {
 		$result = $this->query($query, $vars);
@@ -78,6 +92,23 @@ class MySQL extends Database {
                 return(false);
 	}
 
+	function raw_array_query($query, $vars = array()) {
+		$result = $this->raw_query($query, $vars);
+		if(@$result->num_rows) {
+                        return(@$result->fetch_array(MYSQLI_ASSOC));
+                }
+
+                return(false);
+	}
+        function raw_object_query($query, $vars = array()) {
+		$result = $this->raw_query($query, $vars);
+                if(@$result->num_rows) {
+                        return(@$result->fetch_object($object_type));
+                }
+
+                return(false);
+	}
+
 	// Execute a query, returning an array of objects
 	function object_array_query($table, $vars = array(), $flags = array(), $object_type = 'stdClass') {
 		$result = $this->query($table, $vars);
@@ -91,6 +122,23 @@ class MySQL extends Database {
 				return(false);
 
 			return($array);
+                }
+
+                return(false);
+	}
+
+	function raw_object_array_query($query, $vars = array()) {
+		$result = $this->raw_query($query, $vars);
+                if(@$result->num_rows) {
+                        $array = array();
+                        while($object = $result->fetch_object('stdClass')) {
+                                array_push($array, $object);
+                        }
+
+                        if(!sizeof($array))
+                                return(false);
+
+                        return($array);
                 }
 
                 return(false);

@@ -12,9 +12,13 @@ abstract class Database {
 	abstract public function initialize($host, $user, $pass, $database);
 
 	// Our available query functions
+	abstract public function raw_query($query, $vars = array());
 	abstract public function query($table, $vars = array(), $flags = array());
+	abstract public function raw_array_query($query, $vars = array());
 	abstract public function array_query($table, $vars = array(), $flags = array());
+	abstract public function raw_object_query($query, $vars = array());
 	abstract public function object_query($table, $vars = array(), $flags = array(), $object_tye = 'stdClass');
+	abstract public function raw_object_array_query($query, $vars = array());
 	abstract public function object_array_query($table, $vars = array(), $flags = array(), $object_type = 'stdClass');
 
 	// Other database functions
