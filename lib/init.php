@@ -33,6 +33,7 @@ define('CONFIG_DIR', ROOT_DIR . 'config/');
 
 /* Stop editing here */
 
+include(LIB_DIR . 'mysql.php');
 include(LIB_DIR . 'utility.php');
 
 // Set error level
@@ -54,11 +55,7 @@ function __autoload($class)
 		@include(strtolower($class).".php");
 }
 
-// Get our connection to the database
-$dbtype = DB_TYPE;
-$dbconn = new $dbtype;
-if(strlen(DB_HOST) && strlen(DB_USER) && strlen(DB_PASS) && strlen(DB_NAME))
-	$dbconn->initialize(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+$database = DatabaseFactory::get(DATABASE_TYPE);
 
 // Set up our routing controller
 $routing_controller = new RoutingController;

@@ -1,23 +1,5 @@
 <?php
 
-/****************************************
-
-  Copyright 2010 Terry J. Smith
-
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
-
-****************************************/
-
 // Our MySQL implementation of the abstract database class
 class MySQL extends Database {
 	// Initialize the database connection
@@ -32,67 +14,77 @@ class MySQL extends Database {
 			if($count > count($this->server_list))
 				break;
 
-			$this->conn = @mysql_pconnect($this->server_list[rand(0, sizeof($this->server_list) - 1)], $user, $pass);
+			$this->conn = new mysqli($this->server_list[rand(0, sizeof($this->server_list) - 1)], $user, $pass, $database);
+			if($this->conn->connect_error) {
+				error_log("Unable to connect to MySQL: {$this->conn->connect_error}");
+				$this->conn = false;
+			}
 			$count++;
 		}
-
-		if($this->conn)
-			@mysql_select_db($database, $this->conn);
 	}
 
 	// Execute a query, returning the raw results
-	function query($query, $vars = array()) {
+	function query($table, $vars = array(), $flags = array()) {
+		// Put together the query
+                $lookups = array();
+                foreach($vars as $key => $value) {
+                        array_push($lookups, "`$key` = ':$key'");
+                }
+                $search = implode(" AND ", $lookups);
+
+                // Query our DB
+                if(count($vars))
+                        $query = "SELECT * FROM `$table` WHERE $search";
+                else
+                        $query = "SELECT * FROM `$table`";
+
+                if(sizeof($flags)) {
+                        if(isset($flags['ordercol'])) {
+                                $query .= " ORDER BY `{$flags['ordercol']}`";
+                                if(isset($flags['order']))
+                                        $query .= " {$flags['order']}";
+                        }
+                }
+
 		foreach($vars as $key => $value)
 		{
-			$value = mysql_real_escape_string($value);
+			$value = $this->conn->real_escape_string($value);
 			$query = str_replace(":$key", $value, $query);
 		}
 
-		$results = @mysql_query($query, $this->conn);
-		if(mysql_errno())
-			error_log("MySQL Error: ".mysql_error()."\nQuery: ".$query);
+		if(!$result = $this->conn->query($query))
+			error_log("MySQL Error: " . $this->conn->error . "\nQuery: " . $query);
 
-		if(LOG_QUERY_COUNT) {
-			global $__query_count;
-			$__query_count++;
-		}
-
-		return($results);
+		return($result);
 	}
 
 	// Execute a query, returning a single object
-	function object_query($query, $vars = array()) {
-		$results = $this->query($query, $vars);
-		if(@mysql_num_rows($results))
-		{
-			return(@mysql_fetch_object($results));
+	function object_query($query, $vars = array(), $flags = array(), $object_type = 'stdClass') {
+		$result = $this->query($query, $vars);
+		if(@$result->num_rows) {
+			return(@$result->fetch_object($object_type));
 		}
 
 		return(false);
 	}
 
 	// Execute a query, returning an array of results
-	function array_query($query, $vars = array()) {
-		$results = $this->query($query, $vars);
-                if(@mysql_num_rows($results))
-                {
-                        return(@mysql_fetch_array($results));
+	function array_query($table, $vars = array(), $flags = array()) {
+		$result = $this->query($query, $vars);
+		if(@$result->num_rows) {
+                        return(@$result->fetch_array(MYSQLI_ASSOC));
                 }
 
                 return(false);
 	}
 
 	// Execute a query, returning an array of objects
-	function object_array_query($query, $vars = array()) {
-		$results = $this->query($query, $vars);
-		if(mysql_num_rows($results))
-                {
+	function object_array_query($table, $vars = array(), $flags = array(), $object_type = 'stdClass') {
+		$result = $this->query($table, $vars);
+		if(@$result->num_rows) {	
                         $array = array();
-			$object = @mysql_fetch_object($results);
-			while(is_object($object))
-			{
+			while($object = $result->fetch_object($object_type)) {
 				array_push($array, $object);
-				$object = @mysql_fetch_object($results);
 			}
 
 			if(!sizeof($array))
@@ -102,6 +94,69 @@ class MySQL extends Database {
                 }
 
                 return(false);
+	}
+
+	function insert($table, $vars = array()) {
+		// Break out the columns and values
+                $cols = array();
+		$values = array();
+                foreach($vars as $key => $value) {
+			if($key == 'new_row') continue;
+			array_push($cols, "`$key`");
+			array_push($values, "'" . $this->conn->real_escape_string($value) . "'");
+                }
+
+		$keys = implode(',', $cols);
+		$values = implode(',', $values);
+
+		$query = "INSERT INTO `$table` ($keys) VALUES($values)";
+
+                if(!$result = $this->conn->query($query))
+                        error_log("MySQL Error: " . $this->conn->error . "\nQuery: " . $query);
+
+                return($this->conn->insert_id);
+	}
+
+        function delete($table, $vars = array()) {
+		$values = array();
+		foreach($vars as $key => $value) {
+			array_push($values, "`$key` = '" . $this->conn->real_escape_string($value) . "'");
+		}
+
+		$search = implode(" AND ", $values);
+		$query = "DELETE FROM `$table` WHERE $search";
+
+		if(!$result = $this->conn->query($query))
+                        error_log("MySQL Error: " . $this->conn->error . "\nQuery: " . $query);
+	
+		return($this->conn->affected_rows);
+	}
+
+        function update($table, $search = array(), $vars = array()) {
+		// First put together our vars/cols to update
+		$values = array();
+                foreach($vars as $key => $value) {
+			if($key == 'new_row') continue;
+                        array_push($values, "`$key` = '" . $this->conn->real_escape_string($value) . "'");
+                }
+
+                $update = implode(", ", $values);
+
+		// Then put together our search query
+		$values = array();
+                foreach($search as $key => $value) {
+                        array_push($values, "`$key` = '" . $this->conn->real_escape_string($value) . "'");
+                }
+
+                $search = implode(" AND ", $values);
+
+		$query = "UPDATE `$table` SET $update WHERE $search";
+
+		// Then execute
+		if(!$result = $this->conn->query($query))
+                        error_log("MySQL Error: " . $this->conn->error . "\nQuery: " . $query);
+        
+                return($this->conn->affected_rows);
 	}
 }
 
