@@ -2,6 +2,6 @@
 
 class Example extends DatabaseObject {
 	function __construct() {
-		$this->_setPrimaryKey('example_id');
+		self::$primary_key = 'example_id';
 	}
 }
